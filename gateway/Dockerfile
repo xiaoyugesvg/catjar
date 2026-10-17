@@ -1,12 +1,14 @@
 # catvod-api.jar 是 class 文件版本 65（Java 21），所以构建/运行都用 21
+# 两个 ARG 必须放在第一个 FROM 之前，否则第二个 FROM 取不到 JRE_IMAGE
 ARG JDK_IMAGE=eclipse-temurin:21-jdk-alpine
+ARG JRE_IMAGE=eclipse-temurin:21-jre-alpine
+
 FROM ${JDK_IMAGE} AS build
 WORKDIR /build
 COPY gateway/src ./src
 RUN find src -name '*.java' > sources.txt \
  && javac --add-modules jdk.httpserver -encoding UTF-8 -d classes @sources.txt
 
-ARG JRE_IMAGE=eclipse-temurin:21-jre-alpine
 FROM ${JRE_IMAGE}
 # curl/unzip 用于首次启动自动拉取 release 里的非 dex jar 与依赖
 RUN apk add --no-cache curl unzip \
