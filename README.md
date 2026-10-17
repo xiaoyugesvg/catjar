@@ -223,7 +223,7 @@ timeout.seconds=25
 cache.class.seconds=300
 cache.list.seconds=60
 cache.detail.seconds=600
-play.proxy=true
+play.proxy=false
 
 # 一条源一个 key
 site.douban.className=com.github.catvod.spider.Douban
@@ -272,13 +272,15 @@ site.douban.ext=
 - 已经是 `http(s)` 直链 → 原样返回
 - 是 spider 内部 id → 改写成 `{PUBLIC_BASE_URL}/{key}/play?...`，由网关调用 `playerContent` 后 302 或代理
 
-带防盗链头（Referer/UA）的地址，`play.proxy=true` 时由网关流式转发；不需要时设为 `false` 直接 302 省带宽。
+带防盗链头（Referer/UA）的地址，`play.proxy=false` 时由网关流式转发（**会消耗服务器带宽**）；
+默认 `false` 直接 302 省流量 —— 视频流不经过服务器，服务器只承担 JSON 接口那点流量。
 
 ---
 
 ## 5. 在 App 里使用
 
-在 CatYing 里新增一个 **type=1（JSON 接口）** 源，地址：
+CatYing 里已内置入口：**设置 → 订阅管理 → 云 JVM 源 → 添加接口**，
+把下面的地址粘进去（点「测试连接」会发一次 `ac=class` 验证）：
 
 ```
 http://<IP>:18080/douban?token=<GATEWAY_TOKEN>
@@ -289,6 +291,10 @@ http://<IP>:18080/douban?token=<GATEWAY_TOKEN>
 ```
 https://example.com/douban?token=<GATEWAY_TOKEN>
 ```
+
+云 JVM 源与订阅线路分开保存，在「搜索源」面板里单独成组，可编辑/删除。
+App 只请求 JSON 接口（每次几 KB～几十 KB），`play.proxy=false` 时播放地址 302
+直连，视频流不经过服务器。
 
 ---
 

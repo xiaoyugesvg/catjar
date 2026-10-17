@@ -179,7 +179,8 @@ public final class Main {
         }
 
         if ("detail".equals(kind)) {
-            raw = PlayRewriter.rewrite(raw, site.cfg.key, HttpUtil.baseUrl(ex, cfg.publicBaseUrl));
+            raw = PlayRewriter.rewrite(raw, site.cfg.key,
+                    HttpUtil.baseUrl(ex, cfg.publicBaseUrl), cfg.token);
         }
         if (raw == null || raw.trim().isEmpty()) {
             raw = "{\"list\":[]}";

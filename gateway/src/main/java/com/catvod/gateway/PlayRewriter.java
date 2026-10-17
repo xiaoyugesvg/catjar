@@ -24,7 +24,7 @@ final class PlayRewriter {
     private PlayRewriter() {
     }
 
-    static String rewrite(String json, String siteKey, String baseUrl) {
+    static String rewrite(String json, String siteKey, String baseUrl, String token) {
         if (json == null || json.isEmpty()) return json;
         Matcher mu = URL.matcher(json);
         if (!mu.find()) return json;
@@ -53,6 +53,8 @@ final class PlayRewriter {
                     continue;
                 }
                 String link = baseUrl + "/" + enc(siteKey) + "/play?flag=" + enc(line) + "&id=" + enc(val);
+                // /play 与其它接口一样要鉴权；不带上 token 会 401（表现为"点开就播不了"）
+                if (token != null && !token.isEmpty()) link += "&token=" + enc(token);
                 out.append(d >= 0 ? name + "$" + link : link);
             }
         }

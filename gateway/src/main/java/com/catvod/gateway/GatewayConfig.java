@@ -22,7 +22,7 @@ final class GatewayConfig {
     int cacheClassSeconds = 300;
     int cacheListSeconds = 60;
     int cacheDetailSeconds = 600;
-    boolean playProxy = true;
+    boolean playProxy = false;
     String publicBaseUrl = "";
     final Map<String, SiteConfig> sites = new LinkedHashMap<String, SiteConfig>();
 
@@ -54,7 +54,7 @@ final class GatewayConfig {
         c.cacheClassSeconds = intOf(props.getProperty("cache.class.seconds", "300"), 300);
         c.cacheListSeconds = intOf(props.getProperty("cache.list.seconds", "60"), 60);
         c.cacheDetailSeconds = intOf(props.getProperty("cache.detail.seconds", "600"), 600);
-        c.playProxy = boolOf(props.getProperty("play.proxy", "true"), true);
+        c.playProxy = boolOf(props.getProperty("play.proxy", "false"), false);
         c.publicBaseUrl = trimSlash(env("PUBLIC_BASE_URL", props.getProperty("public.baseUrl", "")));
 
         for (String name : props.stringPropertyNames()) {
