@@ -1,0 +1,28 @@
+# 在基础 compose 之上加一个 Caddy（自动申请/续期 HTTPS 证书）
+#
+# 用法：
+#   1) 在 .env 里加：DOMAIN=example.com
+#   2) 确保 80/443 已放通（阿里云安全组）
+#   3) docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+#
+# 不装宿主机的 Nginx/Certbot，全部在容器里完成。
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?请在 .env 中设置 DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - gateway
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,27 @@
+server {
+    listen __PORT__ default_server;
+    listen [::]:__PORT__ default_server;
+    server_name __DOMAIN__;
+
+    # 详情/搜索返回的 JSON 可能较大；播放代理是流式转发
+    client_max_body_size 8m;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+
+    location / {
+        proxy_pass http://127.0.0.1:18080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        # 播放代理必须关缓冲，否则拖动进度条会卡
+        proxy_buffering off;
+
+        # 让播放器可以按 Range 拖动
+        proxy_set_header Range $http_range;
+        proxy_set_header If-Range $http_if_range;
+    }
+}

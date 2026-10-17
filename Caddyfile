@@ -1,0 +1,10 @@
+# Caddy 自动 HTTPS：把 {$DOMAIN} 反代到 compose 网络里的 gateway:8080
+# 用法见 docker-compose.https.yml
+{$DOMAIN} {
+    encode gzip
+
+    reverse_proxy gateway:8080 {
+        # 播放代理是流式响应，关闭缓冲
+        flush_interval -1
+    }
+}

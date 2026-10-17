@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+      args:
+        # 国内拉不到 Docker Hub 时，在 .env 里改成镜像仓库地址
+        JDK_IMAGE: ${JDK_IMAGE:-eclipse-temurin:17-jdk-alpine}
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:17-jre-alpine}
+    image: catvod-gateway:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      LIBS_DIR: /app/libs
+      CONFIG_FILE: /app/config/gateway.properties
+      # 2 核 1G：堆 320M + metaspace 160M + 直接内存 64M，配 1G swap 足够稳
+      JAVA_OPTS: >-
+        -Xms96m -Xmx320m -XX:MaxMetaspaceSize=160m
+        -XX:MaxDirectMemorySize=64m -XX:+UseSerialGC
+        -XX:+ExitOnOutOfMemoryError
+    volumes:
+      # :z 让 SELinux（Alibaba Cloud Linux 默认 Enforcing）允许容器读挂载目录
+      - ./config:/app/config:ro,z
+      - ./libs:/app/libs:ro,z
+    ports:
+      # 只监听本机，公网入口交给 Nginx
+      - "127.0.0.1:18080:8080"
+    mem_limit: 700m
+    memswap_limit: 1g
+    cpus: 1.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s

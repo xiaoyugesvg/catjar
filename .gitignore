@@ -1,0 +1,14 @@
+# 本机生成的密钥与日志，不提交
+.env
+*.log
+
+# 第三方 jar（体积大且含第三方代码，由使用者自行放入）
+libs/*.jar
+libs/lib/*
+!libs/README.txt
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
