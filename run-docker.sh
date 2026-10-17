@@ -46,8 +46,10 @@ done
 if [ "$missing" = "1" ]; then
   echo
   echo "请先放入："
-  echo "  libs/catvod-api.jar     ← FongMi/TV 根目录 ./gradlew apiJar"
-  echo "  libs/custom_spider.jar  ← FongMi/CatVodSpider 根目录 gradlew spiderJar"
+  echo "  libs/catvod-api.jar     ← FongMi/CatVodSpider 的 app/libs/catvod-api.jar（Java 21）"
+  echo "  libs/custom_spider.jar  ← 必须是非 dex 的 JVM class jar"
+  echo "                            （官方 jar/ 里的预编译版是 classes.dex，网关不能用）"
+  echo "  详见 read.md 的「关于 custom_spider.jar」。"
   exit 1
 fi
 

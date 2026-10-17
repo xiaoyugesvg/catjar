@@ -187,10 +187,11 @@ if [ "$missing" = "1" ]; then
   scp catvod-api.jar    root@$DOMAIN:$APP_DIR/libs/
   scp custom_spider.jar root@$DOMAIN:$APP_DIR/libs/
 
-  catvod-api.jar    ← FongMi/TV 根目录执行 ./gradlew apiJar
-  custom_spider.jar ← FongMi/CatVodSpider 根目录执行 gradlew spiderJar
+  catvod-api.jar    ← FongMi/CatVodSpider 的 app/libs/catvod-api.jar（Java 21）
+  custom_spider.jar ← 必须是非 dex 的 JVM class jar
+                      （官方 jar/ 里的预编译版是 classes.dex，网关不能用）
 
-如果 spider jar 还缺 okhttp/gson 等依赖，放到 $APP_DIR/libs/lib/ 下。
+详见 read.md 的「关于 custom_spider.jar」。如果 spider jar 还缺 okhttp/gson 等依赖，放到 $APP_DIR/libs/lib/ 下。
 
 EOF
   exit 1

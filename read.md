@@ -1,9 +1,11 @@
 # CatVodSpider JAR → HTTP 网关（Docker）
 
-把 FongMi 的 `CatVodSpider` 产出的 `custom_spider.jar` 跑在 JVM 上，对外提供 **TVBox / CatYing type=1 JSON 接口**。
+把 FongMi 的 `CatVodSpider` 产出**非 dex 的 JVM jar** 跑在 JVM 上，对外提供 **TVBox / CatYing type=1 JSON 接口**。
 
 适合没有 Android 环境、或希望在 iOS / 任意 HTTP 客户端上复用 jar 源的场景。
 
+> ⚠️ 官方预编译的 `custom_spider.jar` 是 **Android dex 包**，标准 JVM 不能直接加载。详见下面的「关于 custom_spider.jar」。
+>
 > 本仓库不包含任何账号、Token、密码。部署时由脚本生成随机 `GATEWAY_TOKEN`，只写在本机 `.env` 里（`.gitignore` 已忽略）。
 
 ---
@@ -12,14 +14,51 @@
 
 放到 `libs/`：
 
-| 文件 | 来源 |
-| --- | --- |
-| `libs/catvod-api.jar` | FongMi/TV 根目录执行 `./gradlew apiJar`，产物 `build/outputs/api/catvod-api.jar` |
-| `libs/custom_spider.jar` | FongMi/CatVodSpider 根目录执行 `gradlew spiderJar`，产物 `jar/custom_spider.jar` |
+| 文件 | 官方地址 / 来源 | 能否直接给 JVM 网关用 |
+| --- | --- | --- |
+| `libs/catvod-api.jar` | `https://raw.githubusercontent.com/FongMi/CatVodSpider/main/app/libs/catvod-api.jar` | ✅ 可以（class 版本 65，需要 Java 21） |
+| `libs/custom_spider.jar` | `https://raw.githubusercontent.com/FongMi/CatVodSpider/main/jar/custom_spider.jar` | ❌ 官方是 dex 包，需要换成非 dex 构建 |
 
-> ⚠️ 两个 jar 必须来自**同一次** FongMi/TV 构建，否则接口方法签名可能对不上。
->
-> 如果 `custom_spider.jar` 还缺 okhttp / gson 等依赖，把对应 jar 放进 `libs/lib/`，启动脚本会把 `libs/lib/*` 加进类路径。
+仓库里的 `jars/` 保存了这两个官方文件的镜像（含 SHA256 / MD5），仅作备用与校验；`catvod-api.jar` 可直接复制到 `libs/` 使用。
+
+### 关于 custom_spider.jar（重要）
+
+官方 `jar/custom_spider.jar` 解压后只有：
+
+```
+classes.dex
+META-INF/MANIFEST.MF
+```
+
+它是给 TVBox / FongMi 的 `DexClassLoader` 用的。标准 JVM 不认 `classes.dex`。
+用 dex2jar 转换后虽然能生成 `.class`，但 R8 优化过的类会丢失/改错继承关系，运行时会报：
+
+```
+VerifyError: Expecting a stackmap frame at branch target ...
+AbstractMethodError: Receiver class java.lang.Object ...
+```
+
+所以 JVM 网关需要的是**非 dex 的 `.class` jar**。两条可行路径：
+
+1. **从源码编译（推荐）**：用 FongMi/CatVodSpider 源码，取 javac 中间产物打包，不要用 R8 后的 dex。
+   大致步骤（需要 Android SDK / Gradle）：
+   ```bash
+   git clone https://github.com/FongMi/CatVodSpider
+   cd CatVodSpider
+   ./gradlew :app:assembleRelease
+   # 取 R8 之前的 javac 输出，打包成普通 jar
+   cd app/build/intermediates/javac/release/classes
+   jar cf ../../../../custom_spider-jvm.jar .
+   ```
+   然后把 `custom_spider-jvm.jar` 改名成 `custom_spider.jar` 放进 `libs/`。
+   它依赖的 okhttp / gson / slf4j / jsoup / smbj / quickjs 等 `compileOnly` 库，
+   按实际报错把对应 jar 放进 `libs/lib/`。
+2. **改用 Python / QuickJS 源**：CatVodSpider 仓库自带
+   `examples/python/spider.py`、`examples/javascript/spider.js`，
+   不需要 JVM，也就不存在 dex 问题。
+
+> 如果 `custom_spider.jar` 是未压缩的 class jar，入口脚本会自动识别；
+> 检测到 `classes.dex` 会直接给出明确错误并退出，不会抛 `VerifyError`。
 
 ---
 
@@ -56,7 +95,7 @@ docker compose up -d --build
 
 | 配置 | 说明 |
 | --- | --- |
-| `build.context: .` + `gateway/Dockerfile` | 现场用 JDK 17 编译网关源码，不依赖 Maven 私服 |
+| `build.context: .` + `gateway/Dockerfile` | 现场用 JDK 21 编译网关源码，不依赖 Maven 私服 |
 | `JDK_IMAGE` / `JRE_IMAGE` | 国内拉不到 Docker Hub 时，可在 `.env` 里换成可用镜像仓库 |
 | `ports: 127.0.0.1:18080:8080` | 只监听本机，公网入口交给 Nginx / Caddy |
 | `volumes: ./config` | `gateway.properties`（源配置），只读挂载 |
@@ -191,8 +230,8 @@ https://example.com/douban?token=<GATEWAY_TOKEN>
 - **内存**：1GiB 机器已配 1G swap、JVM 堆 320m；不要同时开大量 playback 代理
 - **镜像拉取**：国内拉不到 `eclipse-temurin` 时，在 `.env` 里设置：
   ```
-  JDK_IMAGE=你的仓库/eclipse-temurin:17-jdk-alpine
-  JRE_IMAGE=你的仓库/eclipse-temurin:17-jre-alpine
+  JDK_IMAGE=你的仓库/eclipse-temurin:21-jdk-alpine
+  JRE_IMAGE=你的仓库/eclipse-temurin:21-jre-alpine
   ```
 - **SELinux**：Alibaba Cloud Linux 默认 Enforcing，compose 已用 `:z` 挂载
 
@@ -219,14 +258,19 @@ https://example.com/douban?token=<GATEWAY_TOKEN>
 ├── run-docker.sh               # 纯 Docker 一键运行
 ├── config/
 │   └── gateway.properties      # 源配置
-├── libs/                       # 放两个 jar（不提交）
+├── jars/                       # 官方 jar 镜像（catvod-api 可用；custom_spider 是 dex）
 │   ├── catvod-api.jar
 │   ├── custom_spider.jar
+│   ├── custom_spider.jar.md5
+│   └── README.txt              # 来源、SHA256 与非 dex 说明
+├── libs/                       # 运行时 jar（git 忽略）
+│   ├── catvod-api.jar
+│   ├── custom_spider.jar       # 必须是 JVM class jar，不能是 dex
 │   └── lib/                    # 额外依赖
 ├── nginx/
 │   └── gateway.conf.template
 └── gateway/
     ├── Dockerfile
-    ├── entrypoint.sh
+    ├── entrypoint.sh           # 检测 dex，缺 jar 时回退 /opt/catvod/jars
     └── src/main/java/…         # 网关源码（零第三方依赖）
 ```

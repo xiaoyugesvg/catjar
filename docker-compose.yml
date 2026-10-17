@@ -7,8 +7,9 @@ services:
       dockerfile: gateway/Dockerfile
       args:
         # 国内拉不到 Docker Hub 时，在 .env 里改成镜像仓库地址
-        JDK_IMAGE: ${JDK_IMAGE:-eclipse-temurin:17-jdk-alpine}
-        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:17-jre-alpine}
+        # catvod-api.jar 是 Java 21 class，不能降到 17
+        JDK_IMAGE: ${JDK_IMAGE:-eclipse-temurin:21-jdk-alpine}
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre-alpine}
     image: catvod-gateway:local
     restart: unless-stopped
     env_file: .env

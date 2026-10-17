@@ -133,6 +133,12 @@ final class Site {
             throw e;
         } catch (ExecutionException e) {
             Throwable cause = e.getCause() == null ? e : e.getCause();
+            // 反射调用会把目标异常再包一层 InvocationTargetException，
+            // 不拆开的话日志只剩一句 "null"，根本看不出源为什么失败。
+            if (cause instanceof java.lang.reflect.InvocationTargetException) {
+                Throwable target = ((java.lang.reflect.InvocationTargetException) cause).getTargetException();
+                if (target != null) cause = target;
+            }
             if (cause instanceof Exception) throw (Exception) cause;
             throw new RuntimeException(cause);
         }

@@ -56,8 +56,7 @@ public final class Main {
         Path configPath = Paths.get(env("CONFIG_FILE", "/app/config/gateway.properties"));
         cfg = GatewayConfig.load(configPath);
 
-        File libsDir = new File(env("LIBS_DIR", "/app/libs"));
-        File spiderJar = new File(libsDir, env("SPIDER_JAR", "custom_spider.jar"));
+        File spiderJar = resolveSpiderJar();
         registry = Registry.load(cfg, spiderJar);
 
         HttpServer server = HttpServer.create(new InetSocketAddress(cfg.port), 0);
@@ -321,8 +320,7 @@ public final class Main {
     private static synchronized void reload() throws Exception {
         Path configPath = Paths.get(env("CONFIG_FILE", "/app/config/gateway.properties"));
         GatewayConfig nextCfg = GatewayConfig.load(configPath);
-        File libsDir = new File(env("LIBS_DIR", "/app/libs"));
-        File spiderJar = new File(libsDir, env("SPIDER_JAR", "custom_spider.jar"));
+        File spiderJar = resolveSpiderJar();
 
         Registry nextRegistry = Registry.load(nextCfg, spiderJar);
         Registry oldRegistry = registry;
@@ -331,6 +329,14 @@ public final class Main {
         CACHE.clear();
         if (oldRegistry != null) oldRegistry.destroy();
         System.out.println("[gateway] reloaded, sites=" + nextRegistry.keys());
+    }
+
+    /** 支持入口脚本传绝对路径（优先 /app/libs，缺失时回退镜像内置 /opt/catvod/jars） */
+    private static File resolveSpiderJar() {
+        String explicit = env("SPIDER_JAR_PATH", "");
+        if (!explicit.isEmpty()) return new File(explicit);
+        File libsDir = new File(env("LIBS_DIR", "/app/libs"));
+        return new File(libsDir, env("SPIDER_JAR", "custom_spider.jar"));
     }
 
     private static String env(String key, String def) {
