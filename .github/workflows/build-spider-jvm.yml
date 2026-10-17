@@ -1,0 +1,136 @@
+name: Build CatVodSpider JVM jar
+
+# 手动触发：Actions → Build CatVodSpider JVM jar → Run workflow
+# 产物：Release "spider-jvm" 下的
+#   custom_spider.jar        —— 非 dex 的 JVM class jar（给网关用）
+#   custom_spider.jar.sha256
+#   spider-deps.zip          —— 运行时依赖（尽力而为，缺什么补什么）
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-spider-jvm.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout catjar
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
+      - name: Install SDK platform (best effort)
+        run: |
+          sdkmanager "platform-tools" "platforms;android-37" >/dev/null 2>&1 \
+            || sdkmanager "platform-tools" "platforms;android-36" >/dev/null 2>&1 \
+            || true
+
+      - name: Checkout CatVodSpider
+        uses: actions/checkout@v4
+        with:
+          repository: FongMi/CatVodSpider
+          path: spider
+
+      - name: Record upstream commit
+        id: upstream
+        run: echo "sha=$(git -C spider rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build release (R8 runs; we only take javac output)
+        working-directory: spider
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Package non-dex jar
+        run: |
+          set -euo pipefail
+          CLASSES=$(find spider/app/build/intermediates/javac -type d -name classes | grep -m1 'release' || true)
+          if [ -z "$CLASSES" ]; then
+            echo "没有找到 javac 输出，列出 javac 相关目录："
+            find spider/app/build/intermediates -maxdepth 5 -type d | grep -i javac || true
+            exit 1
+          fi
+          echo "javac classes: $CLASSES"
+          mkdir -p out
+          (cd "$CLASSES" && jar cf "$GITHUB_WORKSPACE/out/custom_spider.jar" .)
+
+          if grep -aq 'classes.dex' out/custom_spider.jar; then
+            echo "❌ 生成的 jar 仍是 dex，构建失败"
+            exit 1
+          fi
+          unzip -l out/custom_spider.jar | grep -q 'com/github/catvod/spider/' \
+            || { echo "❌ jar 里没有 com/github/catvod/spider 类"; exit 1; }
+
+          sha256sum out/custom_spider.jar | awk '{print $1"  custom_spider.jar"}' \
+            > out/custom_spider.jar.sha256
+          ls -lh out
+
+      - name: Resolve runtime deps (best effort)
+        continue-on-error: true
+        working-directory: spider
+        run: |
+          cat > jvm-deps.init.gradle <<'EOF'
+          allprojects { p ->
+            p.configurations.maybeCreate('jvmDeps')
+            p.dependencies {
+              jvmDeps 'com.google.code.gson:gson:2.14.0'
+              jvmDeps 'com.squareup.okhttp3:okhttp:5.5.0'
+              jvmDeps 'org.slf4j:slf4j-api:2.0.20'
+              jvmDeps 'org.jsoup:jsoup:1.23.2'
+              jvmDeps 'com.hierynomus:smbj:0.15.0'
+              jvmDeps 'wang.harlon.quickjs:wrapper-java:3.2.3'
+            }
+            p.tasks.register('copyJvmDeps', Copy) {
+              from p.configurations.jvmDeps
+              into new File(p.rootDir, 'jvm-deps')
+              include '**/*.jar'
+            }
+          }
+          EOF
+          ./gradlew -I jvm-deps.init.gradle :app:copyJvmDeps --no-daemon || true
+          if [ -d jvm-deps ] && [ "$(ls -A jvm-deps 2>/dev/null)" ]; then
+            (cd jvm-deps && zip -j "$GITHUB_WORKSPACE/out/spider-deps.zip" *.jar)
+          fi
+          ls -lh "$GITHUB_WORKSPACE/out" || true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: custom_spider-jvm
+          path: out/*
+
+      - name: Publish rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: spider-jvm
+          name: CatVodSpider JVM jar（rolling）
+          body: |
+            自动构建自 FongMi/CatVodSpider @ `${{ steps.upstream.outputs.sha }}`
+
+            - `custom_spider.jar`：非 dex 的 JVM class jar
+            - `spider-deps.zip`：运行时依赖（尽力而为，缺什么补什么）
+            - `custom_spider.jar.sha256`
+
+            用法见仓库 `read.md`。
+          files: out/*
+          overwrite_files: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

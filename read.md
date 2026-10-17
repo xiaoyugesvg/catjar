@@ -60,6 +60,36 @@ AbstractMethodError: Receiver class java.lang.Object ...
 > 如果 `custom_spider.jar` 是未压缩的 class jar，入口脚本会自动识别；
 > 检测到 `classes.dex` 会直接给出明确错误并退出，不会抛 `VerifyError`。
 
+### 自动构建非 dex jar（GitHub Actions）
+
+仓库自带工作流：
+
+```
+.github/workflows/build-spider-jvm.yml
+```
+
+使用步骤：
+
+1. 打开 https://github.com/xiaoyugesvg/catjar/actions
+2. 选择 **Build CatVodSpider JVM jar** → **Run workflow**
+3. 构建完成后，在 Release `spider-jvm` 里会得到：
+   - `custom_spider.jar`（非 dex，JVM 可加载）
+   - `custom_spider.jar.sha256`
+   - `spider-deps.zip`（okhttp / gson / slf4j / jsoup / smbj 等运行时依赖，尽力而为）
+
+工作流会 checkout `FongMi/CatVodSpider` 源码，用 Android SDK 执行
+`assembleRelease`，然后取 **R8 之前** 的 `javac` class 输出打包，所以不含
+`classes.dex`。
+
+也可以直接在服务器上执行：
+
+```bash
+bash scripts/fetch-jars.sh
+```
+
+脚本会优先从该 Release 下载非 dex 的 `custom_spider.jar` 和依赖包，
+放到 `libs/` 与 `libs/lib/`。
+
 ---
 
 ## 2. 三种部署方式

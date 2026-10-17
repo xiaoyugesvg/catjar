@@ -56,18 +56,62 @@ else
 fi
 
 echo "==> custom_spider.jar"
+SPIDER_RELEASE="https://github.com/xiaoyugesvg/catjar/releases/download/spider-jvm"
+
 if have "$LIBS/custom_spider.jar" && ! is_dex "$LIBS/custom_spider.jar"; then
   echo "    已存在且是 class jar，跳过"
-elif is_dex "$LIBS/custom_spider.jar"; then
-  echo "    ❌ libs/custom_spider.jar 是 Android dex 包，JVM 网关无法加载。"
-  echo "       请换成从 FongMi/CatVodSpider 源码编译出的非 dex jar。"
-  echo "       详见 read.md 的「关于 custom_spider.jar」。"
-  exit 1
 else
-  echo "    缺少 libs/custom_spider.jar（官方预编译版是 dex，不能直接用）。"
-  echo "    请从源码构建非 dex jar 后放进来，或改用 Python/QuickJS 源。"
-  echo "    参考：read.md 的「关于 custom_spider.jar」。"
-  exit 1
+  # 已有的是 dex 就删掉，避免入口脚本直接报错
+  if is_dex "$LIBS/custom_spider.jar"; then
+    echo "    现有 custom_spider.jar 是 dex，删除后重新获取"
+    rm -f "$LIBS/custom_spider.jar"
+  fi
+
+  ok=0
+  for url in "${CUSTOM_SPIDER_URL:-}" "$SPIDER_RELEASE/custom_spider.jar"; do
+    [ -z "$url" ] && continue
+    echo "    尝试: $url"
+    if download "$url" "$LIBS/custom_spider.jar"; then
+      if is_dex "$LIBS/custom_spider.jar"; then
+        echo "    ❌ 下载到的是 dex，丢弃"
+        rm -f "$LIBS/custom_spider.jar"
+      else
+        ok=1
+        break
+      fi
+    fi
+    rm -f "$LIBS/custom_spider.jar.part"
+  done
+
+  if [ "$ok" != "1" ]; then
+    echo "    ❌ 没有可用的非 dex custom_spider.jar。"
+    echo "       1) 到 https://github.com/xiaoyugesvg/catjar/actions 运行"
+    echo "          「Build CatVodSpider JVM jar」，然后重跑本脚本；"
+    echo "       2) 或按 read.md 从源码构建后放到 $LIBS/custom_spider.jar。"
+    exit 1
+  fi
+  echo "    ✅ 已获取非 dex jar"
+fi
+
+# 运行时依赖（okhttp / gson / slf4j / jsoup / smbj …），有就解压到 libs/lib
+if [ -z "$(ls -A "$LIBS/lib" 2>/dev/null || true)" ]; then
+  echo "==> spider-deps.zip"
+  if download "$SPIDER_RELEASE/spider-deps.zip" "$LIBS/spider-deps.zip"; then
+    mkdir -p "$LIBS/lib"
+    if command -v unzip >/dev/null 2>&1; then
+      unzip -oq "$LIBS/spider-deps.zip" -d "$LIBS/lib"
+    elif command -v python3 >/dev/null 2>&1; then
+      python3 -m zipfile -e "$LIBS/spider-deps.zip" "$LIBS/lib"
+    else
+      echo "    没有 unzip/python3，跳过解压：$LIBS/spider-deps.zip"
+    fi
+    rm -f "$LIBS/spider-deps.zip"
+    echo "    ✅ 依赖已解压到 $LIBS/lib"
+  else
+    echo "    未获取到依赖包（可稍后手动补到 libs/lib）"
+  fi
+else
+  echo "==> spider-deps 已存在，跳过"
 fi
 
 echo
