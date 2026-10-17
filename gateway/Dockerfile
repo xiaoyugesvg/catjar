@@ -10,6 +10,8 @@ RUN find src -name '*.java' > sources.txt \
  && javac --add-modules jdk.httpserver -encoding UTF-8 -d classes @sources.txt
 
 FROM ${JRE_IMAGE}
+# 日志里的中文保持 UTF-8
+ENV LANG=C.UTF-8
 # curl/unzip 用于首次启动自动拉取 release 里的非 dex jar 与依赖
 # su-exec：容器以 root 启动，chown 挂载目录后降权到 app 运行 Java
 RUN apk add --no-cache curl unzip su-exec \

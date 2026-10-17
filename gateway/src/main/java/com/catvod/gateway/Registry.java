@@ -40,26 +40,35 @@ final class Registry {
                 System.err.println("[gateway] 跳过源 " + sc.key + "：className 为空");
                 continue;
             }
-            Class<?> cls = Class.forName(sc.className, true, loader);
-            Constructor<?> ctor = cls.getDeclaredConstructor();
-            ctor.setAccessible(true);
-            Object spider = ctor.newInstance();
-
-            // init(Context, String)：没有 Android 环境，Context 传 null。
-            // Context 类从 spider 自己的 loader 取，保证与 jar 里的方法签名是同一个类。
             try {
-                Class<?> ctxCls = Class.forName("android.content.Context", false, cls.getClassLoader());
-                Method init = cls.getMethod("init", ctxCls, String.class);
-                init.setAccessible(true);
-                init.invoke(spider, (Object) null, sc.ext == null ? "" : sc.ext);
-            } catch (NoSuchMethodException ignored) {
-                // 少数 spider 没有 init，直接跳过
-            } catch (Throwable t) {
-                System.err.println("[gateway] 源 " + sc.key + " init 失败：" + t);
-            }
+                Class<?> cls = Class.forName(sc.className, true, loader);
+                Constructor<?> ctor = cls.getDeclaredConstructor();
+                ctor.setAccessible(true);
+                Object spider = ctor.newInstance();
 
-            registry.sites.put(sc.key, new Site(sc, spider, cfg.timeoutSeconds));
-            System.out.println("[gateway] 已加载源 " + sc.key + " -> " + sc.className);
+                // init(Context, String)：没有 Android 环境，Context 传 null。
+                // Context 类从 spider 自己的 loader 取，保证与 jar 里的方法签名是同一个类。
+                try {
+                    Class<?> ctxCls = Class.forName("android.content.Context", false, cls.getClassLoader());
+                    Method init = cls.getMethod("init", ctxCls, String.class);
+                    init.setAccessible(true);
+                    init.invoke(spider, (Object) null, sc.ext == null ? "" : sc.ext);
+                } catch (NoSuchMethodException ignored) {
+                    // 少数 spider 没有 init，直接跳过
+                } catch (Throwable t) {
+                    System.err.println("[gateway] 源 " + sc.key + " init 失败：" + t);
+                }
+
+                registry.sites.put(sc.key, new Site(sc, spider, cfg.timeoutSeconds));
+                System.out.println("[gateway] 已加载源 " + sc.key + " -> " + sc.className);
+            } catch (ClassNotFoundException | NoClassDefFoundError e) {
+                // 配置里写了某个类，但当前 jar 没带（不同构建/不同分支很常见）
+                // ⇒ 跳过这一条，不要让整个网关起不来
+                System.err.println("[gateway] 跳过源 " + sc.key + "：找不到类 "
+                        + sc.className + "（" + e + "）");
+            } catch (Throwable t) {
+                System.err.println("[gateway] 跳过源 " + sc.key + "：加载失败 " + t);
+            }
         }
         return registry;
     }
