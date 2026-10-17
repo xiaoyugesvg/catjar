@@ -178,20 +178,32 @@ sudo bash deploy.sh 1.2.3.4 --port 18080
 ghcr.io/xiaoyugesvg/catjar:latest
 ```
 
-把仓库里的 [`docker-compose.bt.yml`](docker-compose.bt.yml) 内容粘贴到
-宝塔 → Docker → 编排（Compose）里即可。它只挂载一个 `./data` 目录：
+宝塔 → Docker → 编排 → **添加 YAML 模板**，两个输入框分别粘贴：
 
-- 首次启动自动生成 `data/gateway.properties`
+- **compose 内容**：仓库里的 [`docker-compose.bt.yml`](docker-compose.bt.yml)
+- **.env 内容**：
+
+  ```ini
+  GATEWAY_TOKEN=换成一串32位以上随机字符
+  PUBLIC_BASE_URL=http://你的公网IP:18080
+  HOST_PORT=18080
+  ```
+
+它只挂载一个 `./data` 目录：
+
+- 首次启动自动生成 `data/gateway.properties`（默认源是内置 `Demo`）
 - 自动下载 `catvod-api.jar`、非 dex 的 `custom_spider.jar`、`spider-deps.zip`
 - 自带 `curl`，无需在宿主机装 Java
 
 首次启动后：
 
-1. 宝塔文件管理里编辑 `data/gateway.properties`，加上
-   `site.<key>.className=com.github.catvod.spider.Xxx`
+1. 宝塔文件管理里编辑 `data/gateway.properties`，把默认的
+   `site.demo.…` 换成你要的源：`site.<key>.className=com.github.catvod.spider.Xxx`
+   （类名不存在只会跳过该源并打日志，不会拖垮整个网关）
 2. 重启编排
 3. 安全组 / 宝塔防火墙放通 `18080`
-4. 访问 `http://IP:18080/health`
+4. 访问 `http://IP:18080/health`，再试
+   `http://IP:18080/demo?ac=class&token=你的token`
 
 > 如果 GHCR 包是私有的：在宝塔 → Docker → 仓库里添加
 > `ghcr.io`，用户名填 GitHub 用户名，密码填 PAT；或者到 GitHub
