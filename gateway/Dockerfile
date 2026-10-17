@@ -11,7 +11,8 @@ RUN find src -name '*.java' > sources.txt \
 
 FROM ${JRE_IMAGE}
 # curl/unzip 用于首次启动自动拉取 release 里的非 dex jar 与依赖
-RUN apk add --no-cache curl unzip \
+# su-exec：容器以 root 启动，chown 挂载目录后降权到 app 运行 Java
+RUN apk add --no-cache curl unzip su-exec \
  && adduser -D -H -u 10001 app
 WORKDIR /app
 COPY --from=build /build/classes /app/classes
@@ -23,6 +24,6 @@ COPY config/gateway.properties /opt/catvod/default/gateway.properties
 RUN chmod 755 /app/entrypoint.sh \
  && mkdir -p /app/libs /app/config /app/runtime \
  && chown -R app:app /app /opt/catvod
-USER app
+# 不写 USER app：入口先以 root 修正 bind mount 权限，再 su-exec 降权
 EXPOSE 8080
 ENTRYPOINT ["/app/entrypoint.sh"]
