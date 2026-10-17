@@ -1,0 +1,46 @@
+name: Build gateway image
+
+# 构建并推送网关镜像到 GitHub Container Registry
+# 产物：ghcr.io/xiaoyugesvg/catjar:latest
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'gateway/**'
+      - 'jars/**'
+      - 'config/**'
+      - '.github/workflows/docker-image.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: gateway/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/xiaoyugesvg/catjar:latest
+            ghcr.io/xiaoyugesvg/catjar:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

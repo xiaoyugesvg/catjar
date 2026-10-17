@@ -170,6 +170,33 @@ sudo bash deploy.sh 1.2.3.4 --port 18080
 
 支持 Alibaba Cloud Linux 3 / CentOS / RHEL / Ubuntu / Debian（脚本自动识别 apt/dnf）。
 
+### 方式 E：宝塔 Docker（直接粘贴 compose）
+
+镜像由 GitHub Actions 自动构建：
+
+```
+ghcr.io/xiaoyugesvg/catjar:latest
+```
+
+把仓库里的 [`docker-compose.bt.yml`](docker-compose.bt.yml) 内容粘贴到
+宝塔 → Docker → 编排（Compose）里即可。它只挂载一个 `./data` 目录：
+
+- 首次启动自动生成 `data/gateway.properties`
+- 自动下载 `catvod-api.jar`、非 dex 的 `custom_spider.jar`、`spider-deps.zip`
+- 自带 `curl`，无需在宿主机装 Java
+
+首次启动后：
+
+1. 宝塔文件管理里编辑 `data/gateway.properties`，加上
+   `site.<key>.className=com.github.catvod.spider.Xxx`
+2. 重启编排
+3. 安全组 / 宝塔防火墙放通 `18080`
+4. 访问 `http://IP:18080/health`
+
+> 如果 GHCR 包是私有的：在宝塔 → Docker → 仓库里添加
+> `ghcr.io`，用户名填 GitHub 用户名，密码填 PAT；或者到 GitHub
+> → Packages → catjar → Package settings 把可见性改成 Public。
+
 ---
 
 ## 3. 配置源
@@ -280,8 +307,9 @@ https://example.com/douban?token=<GATEWAY_TOKEN>
 
 ```
 .
-├── docker-compose.yml          # 基础编排（HTTP）
+├── docker-compose.yml          # 基础编排（HTTP，源码构建）
 ├── docker-compose.https.yml    # 追加 Caddy（自动 HTTPS）
+├── docker-compose.bt.yml       # 宝塔用：直接拉 ghcr 镜像，只挂 ./data
 ├── Caddyfile                   # Caddy 反代配置
 ├── .env.example                # 环境变量模板（无真实密钥）
 ├── deploy.sh                   # 宿主机一键部署（Nginx/Certbot）

@@ -2,6 +2,9 @@
 .env
 *.log
 
+# 宝塔 compose 的运行时目录（jar、依赖、配置、下载缓存）
+data/
+
 # 第三方 jar（体积大且含第三方代码，由使用者自行放入）
 libs/*.jar
 libs/lib/*

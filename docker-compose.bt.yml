@@ -1,0 +1,47 @@
+# ============================================================
+# 宝塔 Docker → Compose 直接粘贴这一份即可
+#
+# 首次启动会自动：
+#   · 在 ./data 下生成 gateway.properties（默认配置）
+#   · 下载 catvod-api.jar、非 dex 的 custom_spider.jar、spider-deps.zip
+#
+# 改完 token / 公网地址 / 站点配置后，在宝塔里重启这个编排。
+# ============================================================
+version: "3.8"
+
+services:
+  gateway:
+    image: ghcr.io/xiaoyugesvg/catjar:latest
+    container_name: catvod-gateway
+    restart: unless-stopped
+    environment:
+      # 运行时目录：jar、依赖、配置文件都放这里，挂载 ./data 持久化
+      LIBS_DIR: /app/runtime
+      CONFIG_FILE: /app/runtime/gateway.properties
+      # 改成你自己的随机串（建议 32 位以上）
+      GATEWAY_TOKEN: CHANGE_ME_TO_A_LONG_RANDOM_TOKEN
+      # 手机能访问到的地址；无域名用 http://公网IP:18080
+      PUBLIC_BASE_URL: http://你的公网IP:18080
+      JAVA_OPTS: >-
+        -Xms96m -Xmx320m -XX:MaxMetaspaceSize=160m
+        -XX:MaxDirectMemorySize=64m -XX:+UseSerialGC
+        -XX:+ExitOnOutOfMemoryError
+    volumes:
+      # 只需这一个目录；首次启动会自动生成里面的文件
+      - ./data:/app/runtime
+    ports:
+      - "18080:8080"
+    mem_limit: 700m
+    memswap_limit: 1g
+    cpus: 1.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
